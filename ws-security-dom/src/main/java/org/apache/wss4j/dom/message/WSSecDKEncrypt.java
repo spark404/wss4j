@@ -45,6 +45,8 @@ import java.util.List;
 public class WSSecDKEncrypt extends WSSecDerivedKeyBase {
 
     private String symEncAlgo = WSConstants.AES_128;
+
+    private List<Element> attachmentEncryptedDataElements;
     
     public WSSecDKEncrypt() {
         super();
@@ -53,7 +55,18 @@ public class WSSecDKEncrypt extends WSSecDerivedKeyBase {
     public WSSecDKEncrypt(WSSConfig config) {
         super(config);
     }
-    
+
+    @Override
+    public void prepare(Document doc) throws WSSecurityException {
+        super.prepare(doc);
+
+        //
+        // Prepare for encrypted attachments
+        //
+        attachmentEncryptedDataElements = new ArrayList<Element>();
+
+    }
+
     public Document build(Document doc, WSSecHeader secHeader) throws WSSecurityException {
         
         //
@@ -78,6 +91,16 @@ public class WSSecDKEncrypt extends WSSecDerivedKeyBase {
             parts.add(encP);
         }
         Element externRefList = encryptForExternalRef(null, parts);
+
+        if (attachmentEncryptedDataElements != null) {
+            for (int i = 0; i < attachmentEncryptedDataElements.size(); i++) {
+                Element encryptedData = attachmentEncryptedDataElements.get(i);
+                WSSecurityUtil.prependChildElement(
+                        secHeader.getSecurityHeader(), encryptedData
+                );
+            }
+        }
+
         addExternalRefElement(externRefList, secHeader);
 
         return doc;
@@ -112,9 +135,7 @@ public class WSSecDKEncrypt extends WSSecDerivedKeyBase {
         SecretKey key = KeyUtils.prepareSecretKey(symEncAlgo, derivedKeyBytes);
 
         List<String> encDataRefs = 
-            WSSecEncrypt.doEncryption(
-                document, getWsConfig(), keyInfo, key, symEncAlgo, references, callbackLookup
-            );
+            WSSecEncrypt.doEncryption(document, getWsConfig(), keyInfo, key, symEncAlgo, references, callbackLookup, attachmentCallbackHandler, attachmentEncryptedDataElements);
         if (dataRef == null) {
             dataRef = 
                 document.createElementNS(
@@ -186,5 +207,9 @@ public class WSSecDKEncrypt extends WSSecDerivedKeyBase {
         return derivedKeyLength > 0 ? derivedKeyLength : 
             KeyUtils.getKeyLength(symEncAlgo);
     }
-    
+
+    public List<Element> getAttachmentEncryptedDataElements() {
+        return attachmentEncryptedDataElements;
+    }
+
 }
